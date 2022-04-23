@@ -35,15 +35,14 @@ contract DanteNFT is ERC721Enumerable, ERC721Burnable, ERC2981, Ownable {
     uint256 public revealTimestamp;
 
     uint256 public saleStart;
-    uint256 public whitelistedElements;
 
     uint256 public constant MAX_ELEMENTS = 11;
-    uint256 public constant PRICE_PUBLIC = 100 wei;
-    uint256 public constant PRICE_WHITELIST = 80 wei;
+    uint256 public constant PRICE = 100 wei;
     uint256 public constant MAX_BY_MINT = 3;
     uint256 public constant WHITELIST_CLAIM_WINDOW = 1 hours;
     uint256 public constant PUBLIC_WINDOW = 1 hours;
     uint256 public constant RESERVED = 1;
+    uint96 public constant ROYALTY_FEES = 500;
 
     address public dao;
     
@@ -60,12 +59,12 @@ contract DanteNFT is ERC721Enumerable, ERC721Burnable, ERC2981, Ownable {
         dao = _dao;
         provenance = _provenance;
         // 3% royalty fees to our DAO fund
-        _setDefaultRoyalty(dao, 300);
+        _setDefaultRoyalty(dao, ROYALTY_FEES);
     }
 
     modifier saleIsOpen {
         // check total minted nfts is lower than max allowed
-        require(_totalSupply() <= MAX_ELEMENTS, "Sale end");
+        require(_totalSupply() < MAX_ELEMENTS, "Sale end");
         // time has to be before reveal
         require(block.timestamp < revealTimestamp, "Sale end");
         // sale is set to true
@@ -108,7 +107,7 @@ contract DanteNFT is ERC721Enumerable, ERC721Burnable, ERC2981, Ownable {
         uint256 total = _totalSupply();
 
         // check minter sent enough funds
-        uint256 totalPrice = price(_count, false);
+        uint256 totalPrice = price(_count);
         require(msg.value >= totalPrice, "Not enough funds");
 
         // check that adding the nfts won't go above our max supply
@@ -138,7 +137,7 @@ contract DanteNFT is ERC721Enumerable, ERC721Burnable, ERC2981, Ownable {
         require(block.timestamp <= claimTimestampEnd, "Claim window has expired");
         
         // check enough funds were sent
-        uint256 totalPrice = price(totalToMint, true);
+        uint256 totalPrice = price(totalToMint);
         require(msg.value >= totalPrice, "Value below price");
 
         // mint the required nfts
@@ -158,8 +157,8 @@ contract DanteNFT is ERC721Enumerable, ERC721Burnable, ERC2981, Ownable {
         emit CreateDante(id);
     }
 
-    function price(uint256 _count, bool whitelist) public pure returns (uint256) {
-        return whitelist ? PRICE_WHITELIST.mul(_count) : PRICE_PUBLIC.mul(_count);
+    function price(uint256 _count) public pure returns (uint256) {
+        return PRICE.mul(_count);
     }
 
     function _baseURI() internal view virtual override returns (string memory) {
@@ -223,6 +222,7 @@ contract DanteNFT is ERC721Enumerable, ERC721Burnable, ERC2981, Ownable {
 
     function startSale() public onlyOwner {
         require(saleStart == 0, "cant re-start initial sale");
+        
         saleStart = block.timestamp;
         saleOpen = true;
         claimTimestampEnd = saleStart + WHITELIST_CLAIM_WINDOW;
